@@ -14,7 +14,7 @@ st.set_page_config(
 )
 
 st.title("🤖 My Custom AI Assistant")
-st.caption("Designed, Developed, and Deployed by **ELOM CHINECHEREM EZEKIEL**")
+st.caption("Designed, Developed, and Deployed by **ELOM CHINECHEREM**")
 st.write("---")
 
 # ==========================================
@@ -26,10 +26,8 @@ if not api_key:
     st.error("⚠️ Error: GEMINI_API_KEY not found. Please enter it in the sidebar or add it to Streamlit Secrets.")
     st.stop()
 
-# Initialize Client
 client = genai.Client(api_key=api_key)
 
-# Initialize Session State (For History)
 if "messages" not in st.session_state:
     st.session_state.messages = []
 if "generated_images" not in st.session_state:
@@ -75,36 +73,40 @@ if app_mode == "Text Chat & Voice":
     if user_prompt or audio_recording:
         contents_input = []
         
-        if audio_recording:
+        # Only attach audio if a recording was actually made
+        if audio_recording is not None:
             audio_bytes = audio_recording.read()
-            contents_input.append({"mime_type": "audio/wav", "data": audio_bytes})
-            st.session_state.messages.append({"role": "user", "content": "🎤 *Audio message sent*", "type": "text"})
+            if len(audio_bytes) > 0:
+                contents_input.append({"mime_type": "audio/wav", "data": audio_bytes})
+                st.session_state.messages.append({"role": "user", "content": "🎤 *Audio message sent*", "type": "text"})
             
+        # Only attach text if typed
         if user_prompt:
             contents_input.append(user_prompt)
             st.session_state.messages.append({"role": "user", "content": user_prompt, "type": "text"})
 
-        with st.chat_message("assistant"):
-            try:
-                response_container = st.empty()
-                full_response = ""
+        if contents_input:
+            with st.chat_message("assistant"):
+                try:
+                    response_container = st.empty()
+                    full_response = ""
 
-                response_stream = client.models.generate_content_stream(
-                    model="gemini-3.6-flash",
-                    contents=contents_input,
-                )
+                    response_stream = client.models.generate_content_stream(
+                        model="gemini-3.6-flash",
+                        contents=contents_input,
+                    )
 
-                for chunk in response_stream:
-                    if chunk.text:
-                        full_response += chunk.text
-                        response_container.markdown(full_response)
-                
-                st.session_state.messages.append({"role": "assistant", "content": full_response, "type": "text"})
-                
-            except APIError:
-                st.error("Gemini service busy. Please try again in a moment!")
-            except Exception as e:
-                st.error(f"Error: {e}")
+                    for chunk in response_stream:
+                        if chunk.text:
+                            full_response += chunk.text
+                            response_container.markdown(full_response)
+                    
+                    st.session_state.messages.append({"role": "assistant", "content": full_response, "type": "text"})
+                    
+                except APIError as e:
+                    st.error(f"Gemini API Error: {e.message if hasattr(e, 'message') else e}")
+                except Exception as e:
+                    st.error(f"Error: {e}")
 
 # --- MODE 2: ADVANCED IMAGE GENERATION (IMAGEN 3) ---
 elif app_mode == "Advanced Image (Imagen 3)":
@@ -147,8 +149,8 @@ elif app_mode == "Advanced Image (Imagen 3)":
                     })
                     st.success("Image generated successfully!")
                     
-                except APIError:
-                    st.error("Imagen service busy. Try again soon.")
+                except APIError as e:
+                    st.error(f"Imagen Error: {e}")
                 except Exception as e:
                     st.error(f"Error: {e}")
 
