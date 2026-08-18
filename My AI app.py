@@ -91,7 +91,7 @@ if app_mode == "Text Chat":
                     })
 
                 response_stream = client.models.generate_content_stream(
-                    model="gemini-2.5-flash",
+                    model="gemini-3.6-flash",
                     contents=formatted_contents,
                 )
 
