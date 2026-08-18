@@ -13,7 +13,7 @@ st.set_page_config(
 )
 
 st.title("🤖 My Custom AI Assistant")
-st.caption("Designed, Developed, and Deployed by **Developer**")
+st.caption("Designed, Developed, and Deployed by **ELOM**")
 st.write("---")
 
 # ==========================================
@@ -80,7 +80,7 @@ if app_mode == "Text Chat":
                 full_response = ""
 
                 response_stream = client.models.generate_content_stream(
-                    model="gemini-2.5-flash",
+                    model="gemini-3.6-flash",
                     contents=user_prompt,
                 )
 
