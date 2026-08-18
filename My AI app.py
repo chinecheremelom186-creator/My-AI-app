@@ -13,7 +13,7 @@ st.set_page_config(
 )
 
 st.title("🤖 My Custom AI Assistant")
-st.caption("Designed, Developed, and Deployed by **ELOM**")
+st.caption("Designed, Developed, and Deployed by **Developer**")
 st.write("---")
 
 # ==========================================
@@ -26,7 +26,6 @@ if not api_key:
     st.stop()
 
 try:
-    # Explicitly pass the API key to the GenAI client
     client = genai.Client(api_key=api_key)
 except Exception as e:
     st.error(f"Failed to initialize Gemini Client: {e}")
@@ -45,7 +44,7 @@ with st.sidebar:
     
     app_mode = st.radio(
         "Choose Generation Mode:",
-        ("Text Chat & Voice", "Advanced Image (Imagen 3)", "View Chat History"),
+        ("Text Chat", "Advanced Image (Imagen 3)", "View Chat History"),
         index=0
     )
     
@@ -60,62 +59,48 @@ with st.sidebar:
 # 4. MAIN APPLICATION LOGIC
 # ==========================================
 
-# --- MODE 1: TEXT CHAT & VOICE ---
-if app_mode == "Text Chat & Voice":
-    st.subheader("1. Text/Voice Conversation")
+# --- MODE 1: TEXT CHAT ---
+if app_mode == "Text Chat":
+    st.subheader("1. Text Conversation")
 
     # Display Chat History
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
-            if message["type"] == "text":
-                st.markdown(message["content"])
+            st.markdown(message["content"])
 
-    # Input Methods
-    audio_recording = st.audio_input("Record a voice prompt")
+    # Text Input Only
     user_prompt = st.chat_input("Type your message here...")
 
-    if user_prompt or audio_recording:
-        contents_input = []
-        
-        if audio_recording is not None:
-            audio_bytes = audio_recording.read()
-            if len(audio_bytes) > 0:
-                contents_input.append({"mime_type": "audio/wav", "data": audio_bytes})
-                st.session_state.messages.append({"role": "user", "content": "🎤 *Audio message sent*", "type": "text"})
-            
-        if user_prompt:
-            contents_input.append(user_prompt)
-            st.session_state.messages.append({"role": "user", "content": user_prompt, "type": "text"})
+    if user_prompt:
+        st.session_state.messages.append({"role": "user", "content": user_prompt})
 
-        if contents_input:
-            with st.chat_message("assistant"):
-                try:
-                    response_container = st.empty()
-                    full_response = ""
+        with st.chat_message("assistant"):
+            try:
+                response_container = st.empty()
+                full_response = ""
 
-                    response_stream = client.models.generate_content_stream(
-                        model="gemini-3.6-flash",
-                        contents=contents_input,
-                    )
+                response_stream = client.models.generate_content_stream(
+                    model="gemini-2.5-flash",
+                    contents=user_prompt,
+                )
 
-                    for chunk in response_stream:
-                        if chunk.text:
-                            full_response += chunk.text
-                            response_container.markdown(full_response)
-                    
-                    st.session_state.messages.append({"role": "assistant", "content": full_response, "type": "text"})
-                    
-                except APIError as e:
-                    st.error(f"Gemini API Error: {e.message if hasattr(e, 'message') else e}")
-                except Exception as e:
-                    st.error(f"Error: {e}")
+                for chunk in response_stream:
+                    if chunk.text:
+                        full_response += chunk.text
+                        response_container.markdown(full_response)
+                
+                st.session_state.messages.append({"role": "assistant", "content": full_response})
+                
+            except APIError as e:
+                st.error(f"Gemini API Error: {e.message if hasattr(e, 'message') else e}")
+            except Exception as e:
+                st.error(f"Error: {e}")
 
 # --- MODE 2: ADVANCED IMAGE GENERATION (IMAGEN 3) ---
 elif app_mode == "Advanced Image (Imagen 3)":
     st.subheader("2. High-Graphic Image Generation")
     st.info("Powered by Google Imagen 3. Fill in the form and tap Generate.")
 
-    # Form prevents app from running/generating while typing
     with st.form("image_form"):
         img_prompt = st.text_area("Describe the image you want to create:", height=100)
         aspect_ratio_choice = st.selectbox("Aspect Ratio:", ["16:9", "1:1", "9:16"], index=0)
