@@ -13,7 +13,7 @@ st.set_page_config(
 )
 
 st.title("🤖 My Custom AI Assistant")
-st.caption("Designed, Developed, and Deployed by **ELOM**")
+st.caption("Designed, Developed, and Deployed by **Developer**")
 st.write("---")
 
 # ==========================================
