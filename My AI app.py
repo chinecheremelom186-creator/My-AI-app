@@ -1,6 +1,5 @@
 import streamlit as st
 from google import genai
-from google.genai import types
 from google.genai.errors import APIError
 
 # ==========================================
@@ -14,11 +13,11 @@ st.set_page_config(
 )
 
 st.title("🤖 My Custom AI Assistant")
-st.caption("Designed, Developed, and Deployed by **ELOM CHINECHEREM**")
+st.caption("Designed, Developed, and Deployed by **ELOM**")
 st.write("---")
 
 # ==========================================
-# 2. SECRET KEY CHECK & SESSION STATE
+# 2. SECRET KEY CHECK & INITIALIZATION
 # ==========================================
 api_key = st.secrets.get("GEMINI_API_KEY") or st.sidebar.text_input("Gemini API Key", type="password")
 
@@ -26,7 +25,12 @@ if not api_key:
     st.error("⚠️ Error: GEMINI_API_KEY not found. Please enter it in the sidebar or add it to Streamlit Secrets.")
     st.stop()
 
-client = genai.Client(api_key=api_key)
+try:
+    # Explicitly pass the API key to the GenAI client
+    client = genai.Client(api_key=api_key)
+except Exception as e:
+    st.error(f"Failed to initialize Gemini Client: {e}")
+    st.stop()
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
@@ -73,14 +77,12 @@ if app_mode == "Text Chat & Voice":
     if user_prompt or audio_recording:
         contents_input = []
         
-        # Only attach audio if a recording was actually made
         if audio_recording is not None:
             audio_bytes = audio_recording.read()
             if len(audio_bytes) > 0:
                 contents_input.append({"mime_type": "audio/wav", "data": audio_bytes})
                 st.session_state.messages.append({"role": "user", "content": "🎤 *Audio message sent*", "type": "text"})
             
-        # Only attach text if typed
         if user_prompt:
             contents_input.append(user_prompt)
             st.session_state.messages.append({"role": "user", "content": user_prompt, "type": "text"})
@@ -92,7 +94,7 @@ if app_mode == "Text Chat & Voice":
                     full_response = ""
 
                     response_stream = client.models.generate_content_stream(
-                        model="gemini-3.6-flash",
+                        model="gemini-2.5-flash",
                         contents=contents_input,
                     )
 
@@ -111,31 +113,27 @@ if app_mode == "Text Chat & Voice":
 # --- MODE 2: ADVANCED IMAGE GENERATION (IMAGEN 3) ---
 elif app_mode == "Advanced Image (Imagen 3)":
     st.subheader("2. High-Graphic Image Generation")
-    st.info("Powered by Google Imagen 3. Describe your image in detail.")
+    st.info("Powered by Google Imagen 3. Fill in the form and tap Generate.")
 
-    img_prompt = st.text_area("Describe the image you want to create:", height=100)
+    # Form prevents app from running/generating while typing
+    with st.form("image_form"):
+        img_prompt = st.text_area("Describe the image you want to create:", height=100)
+        aspect_ratio_choice = st.selectbox("Aspect Ratio:", ["16:9", "1:1", "9:16"], index=0)
+        submit_btn = st.form_submit_button("🎨 Generate Image")
 
-    aspect_ratio = st.selectbox("Aspect Ratio:", ["16:9 (Landscape)", "1:1 (Square)", "9:16 (Portrait)"], index=0)
-    
-    ratio_map = {
-        "16:9 (Landscape)": types.AspectRatio.ASPECT_RATIO_16_9,
-        "1:1 (Square)": types.AspectRatio.ASPECT_RATIO_1_1,
-        "9:16 (Portrait)": types.AspectRatio.ASPECT_RATIO_9_16
-    }
-
-    if st.button("Generate High-Quality Image"):
-        if not img_prompt:
-            st.warning("Please provide a description.")
+    if submit_btn:
+        if not img_prompt.strip():
+            st.warning("Please type a description before generating.")
         else:
-            with st.spinner("Generating image..."):
+            with st.spinner("Generating high-quality image..."):
                 try:
                     response = client.models.generate_image(
                         model="imagen-3.0-generate-001",
                         prompt=img_prompt,
-                        config=types.GenerateImageConfig(
-                            aspect_ratio=ratio_map[aspect_ratio],
-                            number_of_images=1,
-                        )
+                        config={
+                            "aspect_ratio": aspect_ratio_choice,
+                            "number_of_images": 1,
+                        }
                     )
                     
                     generated_img = response.generated_images[0]
@@ -185,7 +183,7 @@ elif app_mode == "View Chat History":
         st.write("No images generated yet.")
 
 # ==========================================
-# 5. FOOTER & BRANDING (Persistent)
+# 5. FOOTER & BRANDING
 # ==========================================
 st.write("---")
 st.markdown(
