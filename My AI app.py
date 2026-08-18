@@ -59,11 +59,11 @@ with st.sidebar:
 # 4. MAIN APPLICATION LOGIC
 # ==========================================
 
-# --- MODE 1: TEXT CHAT ---
+# --- MODE 1: TEXT CHAT (With Memory) ---
 if app_mode == "Text Chat":
     st.subheader("1. Text Conversation")
 
-    # Display Chat History
+    # Display Chat History from Session State
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
@@ -73,15 +73,26 @@ if app_mode == "Text Chat":
 
     if user_prompt:
         st.session_state.messages.append({"role": "user", "content": user_prompt})
+        with st.chat_message("user"):
+            st.markdown(user_prompt)
 
         with st.chat_message("assistant"):
             try:
                 response_container = st.empty()
                 full_response = ""
 
+                # Build full history payload so the model remembers past turns
+                formatted_contents = []
+                for m in st.session_state.messages:
+                    role = "user" if m["role"] == "user" else "model"
+                    formatted_contents.append({
+                        "role": role,
+                        "parts": [{"text": m["content"]}]
+                    })
+
                 response_stream = client.models.generate_content_stream(
-                    model="gemini-3.6-flash",
-                    contents=user_prompt,
+                    model="gemini-2.5-flash",
+                    contents=formatted_contents,
                 )
 
                 for chunk in response_stream:
@@ -103,7 +114,7 @@ elif app_mode == "Advanced Image (Imagen 3)":
 
     with st.form("image_form"):
         img_prompt = st.text_area("Describe the image you want to create:", height=100)
-        aspect_ratio_choice = st.selectbox("Aspect Ratio:", ["16:9", "1:1", "9:16"], index=0)
+        aspect_ratio_choice = st.selectbox("Aspect Ratio:", ["1:1", "16:9", "9:16"], index=0)
         submit_btn = st.form_submit_button("🎨 Generate Image")
 
     if submit_btn:
@@ -112,16 +123,17 @@ elif app_mode == "Advanced Image (Imagen 3)":
         else:
             with st.spinner("Generating high-quality image..."):
                 try:
-                    response = client.models.generate_image(
+                    # Using the correct plural 'generate_images' method
+                    result = client.models.generate_images(
                         model="imagen-3.0-generate-001",
                         prompt=img_prompt,
-                        config={
-                            "aspect_ratio": aspect_ratio_choice,
-                            "number_of_images": 1,
-                        }
+                        config=dict(
+                            aspect_ratio=aspect_ratio_choice,
+                            number_of_images=1,
+                        )
                     )
                     
-                    generated_img = response.generated_images[0]
+                    generated_img = result.generated_images[0]
                     img_bytes = generated_img.image.image_bytes
                     
                     st.image(img_bytes, caption=f"Generated: {img_prompt}", use_container_width=True)
