@@ -1,32 +1,244 @@
 import streamlit as st
 from google import genai
+from google.genai import types
 from google.genai.errors import APIError
 
-st.title("My AI Assistant")
+# ==========================================
+# 1. PAGE CONFIGURATION & BRANDING
+# ==========================================
+st.set_page_config(
+    page_title="Custom Assistant - by [ELOM CHINECHEREM EZEKIEL]",
+    page_icon="🤖",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
-# Checks Streamlit Secrets first; falls back to input box if not set
-api_key = st.secrets.get("GEMINI_API_KEY") or st.text_input("Enter Gemini API Key", type="password")
-user_prompt = st.text_area("Ask your AI anything:")
+st.title("🤖 My Custom AI Assistant")
+st.caption("Designed, Developed, and Deployed by **[ELOM CHINECHEREM EZEKIEL]**")
+st.write("---")
 
-if st.button("Generate Response"):
-    if not api_key:
-        st.warning("Please provide an API key in Streamlit Secrets or the text field.")
-    elif not user_prompt:
-        st.warning("Please enter a prompt.")
+# ==========================================
+# 2. SECRET KEY CHECK & SESSION STATE
+# ==========================================
+api_key = st.secrets.get("GEMINI_API_KEY")
+
+if not api_key:
+    st.error("⚠️ Error: GEMINI_API_KEY not found in Streamlit Secrets. Please add it to your Advanced settings.")
+    st.stop()
+
+# Initialize Client
+client = genai.Client(api_key=api_key)
+
+# Initialize Session State (For History)
+if "messages" not in st.session_state:
+    st.session_state.messages = [] # Format: [{"role": "user", "content": "hello", "type": "text/image"}]
+if "generated_images" not in st.session_state:
+    st.session_state.generated_images = []
+
+# ==========================================
+# 3. SIDEBAR / CONTROLS
+# ==========================================
+with st.sidebar:
+    st.header("App Controls")
+    
+    # Generation Mode Selector
+    app_mode = st.radio(
+        "Choose Generation Mode:",
+        ("Text Chat & Voice", "Advanced Image (Imagen 3)", "View Chat History"),
+        index=0
+    )
+    
+    st.write("---")
+    if st.button("🗑️ Clear Current History"):
+        st.session_state.messages = []
+        st.session_state.generated_images = []
+        st.success("History cleared!")
+        st.rerun()
+
+# ==========================================
+# 4. MAIN APPLICATION LOGIC
+# ==========================================
+
+# --- MODE 1: TEXT CHAT & VOICE ---
+if app_mode == "Text Chat & Voice":
+    st.subheader("1. Text/Voice Conversation")
+
+    # Display Chat History (Current Thread)
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            if message["type"] == "text":
+                st.markdown(message["content"])
+            elif message["type"] == "image":
+                st.image(message["content"], caption="User uploaded image")
+
+    # Input Methods (Voice & Text)
+    # 1. Voice
+    audio_recording = st.audio_input("Record a voice prompt (handles Voice-to-Text automatically)")
+    # 2. Text
+    user_prompt = st.chat_input("Type your message here...")
+
+    # Action Logic when input is received
+    if user_prompt or audio_recording:
+        contents_input = []
+        
+        if audio_recording:
+            audio_bytes = audio_recording.read()
+            # Store audio content temporarily for processing (multimodal)
+            contents_input.append({"mime_type": "audio/wav", "data": audio_bytes})
+            # For history visualization, we show 'Audio Message'
+            st.session_state.messages.append({"role": "user", "content": "🎤 *Audio message sent*", "type": "text"})
+            
+        if user_prompt:
+            contents_input.append(user_prompt)
+            st.session_state.messages.append({"role": "user", "content": user_prompt, "type": "text"})
+            
+        # Display User Input instantly
+        st.rerun() # Refresh to show user message
+
+    # Generate Response if needed
+    if st.session_state.messages and st.session_state.messages[-1]["role"] == "user":
+        
+        # Pull context from existing session state history
+        history_context = [
+            {"role": "user", "parts": [m["content"]]} if m["role"] == "user" else {"role": "model", "parts": [m["content"]]}
+            for m in st.session_state.messages[:-1] if m["type"] == "text"
+        ]
+        
+        with st.chat_message("assistant"):
+            st.write("Thinking...")
+            
+            try:
+                # Add current multimodal input to context
+                current_input_data = []
+                if audio_recording:
+                    audio_bytes = audio_recording.read()
+                    current_input_data.append({"mime_type": "audio/wav", "data": audio_bytes})
+                if user_prompt:
+                    current_input_data.append(user_prompt)
+                    
+                final_contents = history_context + [{"role": "user", "parts": current_input_data}]
+
+                response_container = st.empty()
+                full_response = ""
+
+                # Stream response
+                response_stream = client.models.generate_content_stream(
+                    model="gemini-2.0-flash",
+                    contents=final_contents,
+                )
+
+                for chunk in response_stream:
+                    if chunk.text:
+                        full_response += chunk.text
+                        response_container.markdown(full_response)
+                
+                # Save Assistant Response to Session State
+                st.session_state.messages.append({"role": "assistant", "content": full_response, "type": "text"})
+                
+            except APIError:
+                st.error("Gemini is currently overloaded. Please wait a few seconds.")
+            except Exception as e:
+                st.error(f"Error: {e}")
+
+# --- MODE 2: ADVANCED IMAGE GENERATION (IMAGEN 3) ---
+elif app_mode == "Advanced Image (Imagen 3)":
+    st.subheader("2. High-Graphic Image Generation")
+    st.info("Powered by Google Imagen 3. Describe your image in detail.")
+
+    # Image Prompt Input
+    img_prompt = st.text_area("Describe the image you want to create:", height=100, placeholder="e.g., A photorealistic portrait of a developer working on a phone app, studio lighting, highly detailed.")
+
+    col1, col2 = st.columns([1, 1])
+    
+    aspect_ratio = col1.selectbox("Aspect Ratio:", ["16:9 (Landscape)", "1:1 (Square)", "9:16 (Portrait)"], index=0)
+    
+    ratio_map = {
+        "16:9 (Landscape)": types.AspectRatio.ASPECT_RATIO_16_9,
+        "1:1 (Square)": types.AspectRatio.ASPECT_RATIO_1_1,
+        "9:16 (Portrait)": types.AspectRatio.ASPECT_RATIO_9_16
+    }
+
+    if st.button("Generate High-Quality Image"):
+        if not img_prompt:
+            st.warning("Please provide a description.")
+        else:
+            with st.spinner("Generating High-Graphic Image with Imagen 3..."):
+                try:
+                    # Execute generation
+                    response = client.models.generate_image(
+                        model="imagen-3.0-generate-001",
+                        prompt=img_prompt,
+                        config=types.GenerateImageConfig(
+                            aspect_ratio=ratio_map[aspect_ratio],
+                            number_of_images=1,
+                            # Optional: Add negative prompts or styles
+                        )
+                    )
+                    
+                    # Process and Display
+                    generated_img = response.generated_images[0]
+                    img_bytes = generated_img.image.image_bytes
+                    
+                    st.image(img_bytes, caption=f"Generated: {img_prompt}", use_container_width=True)
+                    
+                    # Store image data in Session State (for the session)
+                    st.session_state.generated_images.append({
+                        "prompt": img_prompt,
+                        "data": img_bytes,
+                        "ratio": aspect_ratio
+                    })
+                    st.success("Image generated successfully!")
+                    
+                except APIError:
+                    st.error("Imagen service busy. Try again soon.")
+                except Exception as e:
+                    st.error(f"Error: {e}")
+
+# --- MODE 3: VIEW CHAT HISTORY ---
+elif app_mode == "View Chat History":
+    st.subheader("3. Session History & Archives")
+    
+    st.write("---")
+    st.write("#### Conversation History")
+    if st.session_state.messages:
+        for message in st.session_state.messages:
+            role_label = "**You:**" if message["role"] == "user" else "**Assistant:**"
+            if message["type"] == "text":
+                st.markdown(f"{role_label} {message['content']}")
+            elif message["type"] == "image":
+                st.write(f"{role_label}")
+                st.image(message["content"], caption="Uploaded photo", width=200)
+            st.write("") # Spacer
     else:
-        try:
-            client = genai.Client(api_key=api_key)
-            
-            # Stream the response live line-by-line for fast rendering
-            response = client.models.generate_content_stream(
-                model="gemini-3.6-flash",
-                contents=user_prompt,
-            )
-            
-            st.subheader("Response:")
-            st.write_stream(chunk.text for chunk in response if chunk.text)
-            
-        except APIError:
-            st.error("The Gemini service is experiencing high traffic right now. Please wait a moment and try again!")
-        except Exception as e:
-            st.error(f"An error occurred: {e}")
+        st.write("No conversation history yet in this session.")
+
+    st.write("---")
+    st.write("#### Generated Image Gallery")
+    if st.session_state.generated_images:
+        cols = st.columns(3) # Display in a grid
+        for i, img in enumerate(st.session_state.generated_images):
+            with cols[i % 3]:
+                st.image(img["data"], caption=f"'{img['prompt'][:40]}...'", use_container_width=True)
+                # Download link for the image bytes
+                st.download_button(
+                    label=f"Download Image #{i+1}",
+                    data=img["data"],
+                    file_name=f"generated_ai_image_{i+1}.png",
+                    mime="image/png",
+                    key=f"dl_{i}"
+                )
+    else:
+        st.write("No images generated in this session.")
+
+# ==========================================
+# 5. FOOTER & BRANDING (Persistent)
+# ==========================================
+st.write("---")
+st.markdown(
+    """
+    <div style='text-align: center;'>
+        Created by <span style='color: #4CAF50; font-weight: bold;'>Your Name</span>. All rights reserved.
+    </div>
+    """,
+    unsafe_allow_type="html"
+)
