@@ -91,9 +91,13 @@ if app_mode == "Text Chat":
                     })
 
                 response_stream = client.models.generate_content_stream(
-                    model="gemini-3.6-flash",
-                    contents=formatted_contents,
-                )
+    model="gemini-3.6-flash",
+    contents=formatted_contents,
+    config={
+        "system_instruction": "You are a custom AI assistant created, designed, and deployed by a developer named Developer. If anyone asks who created or developed you, you must state that you were built by Developer."
+    }
+)
+
 
                 for chunk in response_stream:
                     if chunk.text:
