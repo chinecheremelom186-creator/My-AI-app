@@ -6,14 +6,14 @@ from google.genai.errors import APIError
 # 1. PAGE CONFIGURATION & BRANDING
 # ==========================================
 st.set_page_config(
-    page_title="My Custom AI Assistant",
+    page_title="My LITTLE AI Assistant",
     page_icon="🤖",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-st.title("🤖 My Custom AI Assistant")
-st.caption("Designed, Developed, and Deployed by **Developer**")
+st.title("🤖 My LITTLE AI Assistant")
+st.caption("Designed, Developed, and Deployed by **ELOM CHINECHEREM**")
 st.write("---")
 
 # ==========================================
@@ -94,7 +94,7 @@ if app_mode == "Text Chat":
     model="gemini-3.6-flash",
     contents=formatted_contents,
     config={
-        "system_instruction": "You are a custom AI assistant created, designed, and deployed by a developer named Developer. If anyone asks who created or developed you, you must state that you were built by Developer."
+        "system_instruction": "You are a LITTLE AI assistant created, designed, and deployed by a developer named ELOM CHINENECHEREM. If anyone asks who created or developed you, you must state that you were built by Developer."
     }
 )
 
